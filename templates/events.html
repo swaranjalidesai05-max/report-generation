@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Events - College Event Report System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Events</h2>
+    {% if session.user_id %}
+    <a href="{{ url_for('add_event') }}" class="btn btn-primary">Add New Event</a>
+    {% endif %}
+</div>
+
+{% if events %}
+    <div class="events-grid">
+        {% for event in events %}
+        <div class="event-card">
+            {% if event.event_photo %}
+            <div class="event-card-image">
+                <img src="/{{ event.event_photo }}" alt="{{ event.title }}">
+            </div>
+            {% endif %}
+            <div class="event-card-content">
+                <h3>{{ event.title }}</h3>
+                <div class="event-meta">
+                    <p><strong>Date:</strong> {{ event.date }}</p>
+                    <p><strong>Venue:</strong> {{ event.venue }}</p>
+                    <p><strong>Department:</strong> {{ event.department }}</p>
+                </div>
+                {% if event.description %}
+                <p class="event-description">{{ event.description[:150] }}{% if event.description|length > 150 %}...{% endif %}</p>
+                {% endif %}
+                <div class="event-actions">
+                    {% if session.user_id %}
+                    <a href="{{ url_for('generate_report', event_id=event.id) }}" class="btn btn-small btn-primary">Generate Report</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <p>No events found. {% if session.user_id %}<a href="{{ url_for('add_event') }}">Add your first event</a>{% endif %}</p>
+    </div>
+{% endif %}
+{% endblock %}

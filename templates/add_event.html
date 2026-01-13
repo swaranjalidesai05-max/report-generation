@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Add Event - College Event Report System{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Add New Event</h2>
+</div>
+
+<div class="form-container">
+    <form method="POST" action="{{ url_for('add_event') }}" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="title">Event Title *</label>
+            <input type="text" id="title" name="title" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="date">Event Date *</label>
+            <input type="date" id="date" name="date" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="venue">Venue *</label>
+            <input type="text" id="venue" name="venue" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="department">Department *</label>
+            <input type="text" id="department" name="department" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Event Description</label>
+            <textarea id="description" name="description" rows="5"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="academic_year">Academic Year *</label>
+            <input type="text" id="academic_year" name="academic_year" placeholder="2025-26" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="resource_person">Resource Person Name *</label>
+            <input type="text" id="resource_person" name="resource_person" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="resource_designation">Designation</label>
+            <input type="text" id="resource_designation" name="resource_designation">
+        </div>
+        
+        <div class="form-group">
+            <label for="resource_organization">Organization</label>
+            <input type="text" id="resource_organization" name="resource_organization">
+        </div>
+        
+        <div class="form-group">
+            <label for="event_time">Event Time *</label>
+            <input type="time" id="event_time" name="event_time" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="event_type">Event Type</label>
+            <select id="event_type" name="event_type">
+                <option value="">Select Event Type</option>
+                <option value="Expert Session">Expert Session</option>
+                <option value="Workshop">Workshop</option>
+                <option value="Seminar">Seminar</option>
+                <option value="Webinar">Webinar</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="permission_letter">Permission Letter (Scanned)</label>
+            <input type="file" id="permission_letter" name="permission_letter" accept=".jpg,.png,.pdf">
+            <small>Accepted formats: JPG, PNG, PDF (Max 16MB)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="invitation_letter">Invitation Letter (Scanned)</label>
+            <input type="file" id="invitation_letter" name="invitation_letter" accept=".jpg,.png,.pdf">
+            <small>Accepted formats: JPG, PNG, PDF (Max 16MB)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="notice_letter">Notice (Scanned)</label>
+            <input type="file" id="notice_letter" name="notice_letter" accept=".jpg,.png,.pdf">
+            <small>Accepted formats: JPG, PNG, PDF (Max 16MB)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="event_photos">Event Photographs</label>
+            <input type="file" id="event_photos" name="event_photos" accept=".jpg,.png" multiple>
+            <small>Accepted formats: JPG, PNG (Max 16MB per file). You can select multiple files.</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="attendance_photo">Attendance Sheet Photo</label>
+            <input type="file" id="attendance_photo" name="attendance_photo" accept="image/*">
+            <small>Accepted formats: JPG, PNG, GIF (Max 16MB)</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="outcome_1">Outcome 1 *</label>
+            <input type="text" id="outcome_1" name="outcome_1" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="outcome_2">Outcome 2 *</label>
+            <input type="text" id="outcome_2" name="outcome_2" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="outcome_3">Outcome 3</label>
+            <input type="text" id="outcome_3" name="outcome_3">
+        </div>
+        
+        <div class="form-group">
+            <label for="appreciation_letter">Appreciation Letter (Scanned)</label>
+            <input type="file" id="appreciation_letter" name="appreciation_letter" accept=".jpg,.png,.pdf">
+            <small>Accepted formats: JPG, PNG, PDF (Max 16MB)</small>
+        </div>
+        
+        <div class="form-group">
+            <label>Feedback Inputs</label>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label for="feedback_name_1">Feedback Name</label>
+                <input type="text" id="feedback_name_1" name="feedback_name[]">
+            </div>
+            <div class="form-group">
+                <label for="feedback_rating_1">Feedback Rating</label>
+                <select id="feedback_rating_1" name="feedback_rating[]">
+                    <option value="">Select Rating</option>
+                    <option value="Excellent">Excellent</option>
+                    <option value="Very Good">Very Good</option>
+                    <option value="Good">Good</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="feedback_comment_1">Feedback Comment</label>
+                <textarea id="feedback_comment_1" name="feedback_comment[]" rows="3"></textarea>
+            </div>
+            <div class="form-group" style="margin-top: 1.5rem;">
+                <label for="feedback_name_2">Feedback Name</label>
+                <input type="text" id="feedback_name_2" name="feedback_name[]">
+            </div>
+            <div class="form-group">
+                <label for="feedback_rating_2">Feedback Rating</label>
+                <select id="feedback_rating_2" name="feedback_rating[]">
+                    <option value="">Select Rating</option>
+                    <option value="Excellent">Excellent</option>
+                    <option value="Very Good">Very Good</option>
+                    <option value="Good">Good</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="feedback_comment_2">Feedback Comment</label>
+                <textarea id="feedback_comment_2" name="feedback_comment[]" rows="3"></textarea>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Add Event</button>
+            <a href="{{ url_for('events') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
