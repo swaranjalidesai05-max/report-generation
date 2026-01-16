@@ -57,7 +57,7 @@ def init_db():
             academic_year TEXT,
             resource_person TEXT,
             resource_designation TEXT,
-            resource_organization TEXT,
+            event_coordinator TEXT,
             event_time TEXT,
             event_type TEXT,
             permission_letter TEXT,
@@ -82,7 +82,7 @@ def init_db():
         ("academic_year", "TEXT"),
         ("resource_person", "TEXT"),
         ("resource_designation", "TEXT"),
-        ("resource_organization", "TEXT"),
+        ("event_coordinator", "TEXT"),
         ("event_time", "TEXT"),
         ("event_type", "TEXT"),
         ("permission_letter", "TEXT"),
@@ -157,92 +157,234 @@ def login_required(f):
     return wrap
 
 
-# ---------------- DOCX HELPERS ----------------
+# ---------------- DOCX HELPERS ---------------- 
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-def replace_placeholders(doc, data):
-    """Replace simple {{...}} placeholders in paragraphs and table cells."""
-
-    def _replace_in_paragraph(paragraph):
-        if not paragraph.text:
-            return
-        for k, v in data.items():
-            if k in paragraph.text:
-                paragraph.text = paragraph.text.replace(k, v or "")
-
-    # Top‑level paragraphs
+def replace_placeholders(doc, replacements):
+    """Replace placeholders in paragraphs and table cells."""
+    def replace_in_paragraph(p):
+        full_text = "".join(run.text for run in p.runs)
+        modified = False
+        for placeholder, value in replacements.items():
+            if placeholder in full_text:
+                # Clear all runs
+                for run in p.runs:
+                    run.text = ""
+                # Add new text with replacement
+                p.add_run(full_text.replace(placeholder, str(value or "")))
+                modified = True
+        return modified
+    
+    # Replace in paragraphs
     for p in doc.paragraphs:
-        _replace_in_paragraph(p)
-
-    # Paragraphs inside tables
+        replace_in_paragraph(p)
+    
+    # Replace in table cells
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for p in cell.paragraphs:
-                    _replace_in_paragraph(p)
+                    replace_in_paragraph(p)
+    
+    # Replace in headers/footers
+    for section in doc.sections:
+        for header in [section.header, section.footer]:
+            for p in header.paragraphs:
+                replace_in_paragraph(p)
+            for table in header.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            replace_in_paragraph(p)
+
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+def insert_event_details_paragraph(doc, marker, event):
+    for p in doc.paragraphs:
+        if marker in p.text:
+            # marker clear
+            p.text = ""
+
+            fields = [
+                ("Academic Year", event["academic_year"]),
+                ("Name of Event", event["title"]),
+                ("Resource Person", event["resource_person"]),
+                ("Event Type", event["event_type"]),
+                ("Date", event["date"]),
+                ("Time", event["event_time"]),
+                ("Venue", event["venue"]),
+                ("Department", event["department"]),
+                ("Designation", event["resource_designation"]),
+                ("Event Coordinator", event["event_coordinator"]),
+            ]
+
+            # 🔥 IMPORTANT: insert BEFORE marker paragraph
+            for label, value in reversed(fields):
+                para = p.insert_paragraph_before()
+                para.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                para.paragraph_format.space_before = Pt(0)
+                para.paragraph_format.space_after = Pt(2)
+                para.paragraph_format.line_spacing = 1
+
+                r1 = para.add_run(label)
+                r1.bold = True
+                r1.font.name = "Times New Roman"
+                r1.font.size = Pt(12)
+
+                para.add_run("\t")
+
+                r2 = para.add_run(value or "")
+                r2.bold = False
+                r2.font.name = "Times New Roman"
+                r2.font.size = Pt(12)
+
+            return
 
 
 def insert_full_page_image(doc, marker, path):
     if not path or not os.path.exists(path):
         return
-    for p in doc.paragraphs:
-        if marker in p.text:
-            p.clear()
+
+    def process_paragraph(p):
+        full_text = "".join(run.text for run in p.runs)
+        if marker in full_text:
+            for run in p.runs:
+                run.text = ""
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            p.add_run().add_picture(path, width=Inches(6.5))
-            doc.add_page_break()
+            p.add_run().add_picture(path, width=Inches(6))
+            p.paragraph_format.keep_together = True
+            return True
+        return False
+
+    
+    for p in doc.paragraphs:
+        if process_paragraph(p):
             return
 
+    
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    if process_paragraph(p):
+                        return
+
+    
+    for section in doc.sections:
+        header = section.header
+        for p in header.paragraphs:
+            if process_paragraph(p):
+                return
+
+        for table in header.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for p in cell.paragraphs:
+                        if process_paragraph(p):
+                            return
+
+
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 def insert_event_photos(doc, marker, photos):
     if not photos:
         return
+
     for p in doc.paragraphs:
         if marker in p.text:
-            p.clear()
+            p.text = p.text.replace(marker, "")
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
             for img in photos:
                 if os.path.exists(img):
-                    p.add_run().add_picture(img, width=Inches(5))
+                    run = p.add_run()
+                    run.add_picture(img, width=Inches(5))
                     p.add_run().add_break()
+
             return
 
+from docx.enum.text import WD_BREAK
+from docx.shared import Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import os
 
 def insert_attendance(doc, marker, path):
     if not path or not os.path.exists(path):
         return
+
     for p in doc.paragraphs:
         if marker in p.text:
             p.clear()
+
+           
+            run = p.add_run()
+            run.add_break(WD_BREAK.PAGE)
+
+            
+            title_run = p.add_run("Attendance\n")
+            title_run.bold = True
+            title_run.font.size = Inches(0.25)  # visually bold/big title
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            
+            p.paragraph_format.keep_with_next = True
+
             ext = os.path.splitext(path)[1].lower()
+
+            
             if ext in [".jpg", ".jpeg", ".png"]:
-                p.add_run().add_picture(path, width=Inches(6.5))
+                img_run = p.add_run()
+                img_run.add_picture(path, width=Inches(8.0))
             else:
-                p.add_run("Attendance attached as scanned document")
+                p.add_run("\nAttendance attached as scanned document")
+
             return
 
 
+from docx.shared import Pt
+
+def set_cell_font(cell, bold=False):
+    for p in cell.paragraphs:
+        for run in p.runs:
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(12)
+            run.bold = bold
+
+
 def insert_feedback_table(doc, marker, feedback):
-    if not feedback or len(feedback) < 2:
+    if not feedback or len(feedback) < 1:
         return
+
     feedback = feedback[:10]
+
     for p in doc.paragraphs:
         if marker in p.text:
             p.clear()
+
             table = doc.add_table(rows=1, cols=3)
-            # Use Table Grid if it exists; otherwise keep default to avoid KeyError
             try:
                 table.style = "Table Grid"
             except KeyError:
                 pass
-            table.rows[0].cells[0].text = "Name"
-            table.rows[0].cells[1].text = "Rating"
-            table.rows[0].cells[2].text = "Comment"
+
+            headers = ["Name", "Rating", "Comment"]
+            for i, text in enumerate(headers):
+                cell = table.rows[0].cells[i]
+                cell.text = text
+                set_cell_font(cell, bold=True)
+
             for fb in feedback:
                 row = table.add_row().cells
                 row[0].text = fb.get("name", "")
                 row[1].text = fb.get("rating", "")
                 row[2].text = fb.get("comment", "")
+
+                for cell in row:
+                    set_cell_font(cell)
+
             return
 
 
@@ -313,9 +455,24 @@ def logout():
 @login_required
 def events():
     conn = get_db()
-    events = conn.execute("SELECT * FROM events ORDER BY id DESC").fetchall()
+    rows = conn.execute("SELECT * FROM events ORDER BY id DESC").fetchall()
     conn.close()
+
+    events = []
+    for e in rows:
+        event = dict(e)   # convert sqlite row to dict
+        # Parse event_photos JSON and ensure it's a list
+        try:
+            event["photos"] = json.loads(e["event_photos"]) if e["event_photos"] else []
+        except (json.JSONDecodeError, TypeError):
+            event["photos"] = []
+        # Ensure photos is always a list
+        if not isinstance(event["photos"], list):
+            event["photos"] = []
+        events.append(event)
+
     return render_template("events.html", events=events)
+
 
 
 @app.route("/add_event", methods=["GET", "POST"])
@@ -330,7 +487,7 @@ def add_event():
         academic_year = request.form.get("academic_year", "")
         resource_person = request.form.get("resource_person", "")
         resource_designation = request.form.get("resource_designation", "")
-        resource_organization = request.form.get("resource_organization", "")
+        event_coordinator = request.form.get("event_coordinator", "")
         event_time = request.form.get("event_time", "")
         event_type = request.form.get("event_type", "")
         outcome_1 = request.form.get("outcome_1", "")
@@ -389,7 +546,7 @@ def add_event():
             INSERT INTO events (
                 title, date, venue, department, description,
                 event_photo, academic_year, resource_person,
-                resource_designation, resource_organization,
+                resource_designation, event_coordinator,
                 event_time, event_type,
                 permission_letter, invitation_letter, notice_letter,
                 appreciation_letter, event_photos, attendance_photo,
@@ -407,7 +564,7 @@ def add_event():
                 academic_year,
                 resource_person,
                 resource_designation,
-                resource_organization,
+                event_coordinator,
                 event_time,
                 event_type,
                 permission_letter,
@@ -430,6 +587,22 @@ def add_event():
 
     return render_template("add_event.html")
 
+@app.route("/event/<int:event_id>")
+@login_required
+def view_event(event_id):
+    conn = get_db()
+    event = conn.execute(
+        "SELECT * FROM events WHERE id=?", (event_id,)
+    ).fetchone()
+    conn.close()
+
+    if not event:
+        flash("Event not found")
+        return redirect(url_for("events"))
+
+    photos = json.loads(event["event_photos"]) if event["event_photos"] else []
+
+    return render_template("view_event.html", event=event, photos=photos)
 
 @app.route("/generate_report/<int:event_id>")
 @login_required
@@ -456,7 +629,8 @@ def generate_report(event_id):
         "{{department}}": event["department"],
         "{{resource_person}}": event["resource_person"],
         "{{resource_designation}}": event["resource_designation"],
-        "{{resource_organization}}": event["resource_organization"],
+        "{{event_coordinator}}": event["event_coordinator"],
+        "{{event coordinator}}": event["event_coordinator"],
         # support both {{event_description}} and {{event description}} in template
         "{{event_description}}": event["description"],
         "{{event description}}": event["description"],
@@ -464,6 +638,8 @@ def generate_report(event_id):
         "{{outcome_2}}": event["outcome_2"],
         "{{outcome_3}}": event["outcome_3"],
     })
+
+    insert_event_details_paragraph(doc, "<<EVENT_DETAILS>>", event)
 
     insert_full_page_image(doc, "<<IMAGE_PERMISSION>>", event["permission_letter"])
     insert_full_page_image(doc, "<<IMAGE_INVITATION>>", event["invitation_letter"])

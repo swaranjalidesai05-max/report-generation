@@ -7,23 +7,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <nav class="navbar">
+    <nav class="navbar mr-auto">
         <div class="container">
-            <div class="nav-brand">
-                <h1>College Event Reports</h1>
-            </div>
-            <ul class="nav-menu">
-                <li><a href="{{ url_for('events') }}">Events</a></li>
-                {% if session.user_id %}
-                    <li><a href="{{ url_for('add_event') }}">Add Event</a></li>
-                    <li><a href="{{ url_for('reports') }}">Reports</a></li>
-                    <li><a href="{{ url_for('logout') }}">Logout ({{ session.username }})</a></li>
-                {% else %}
-                    <li><a href="{{ url_for('login') }}">Login</a></li>
-                {% endif %}
-            </ul>
+          <div class="nav-brand">
+            <img src="{{ url_for('static', filename='clg_logo.jpg') }}" class="logo" alt="NMIET Logo">
+            <h1>NMIET Event Reports</h1>
+          </div>
+      
+          <ul class="nav-menu">
+            <li><a href="{{ url_for('events') }}">Events</a></li>
+            {% if session.user_id %}
+              <li><a href="{{ url_for('add_event') }}">Add Event</a></li>
+              <li><a href="{{ url_for('reports') }}">Reports</a></li>
+              <li><a href="{{ url_for('logout') }}">Logout ({{ session.username }})</a></li>
+            {% else %}
+              <li><a href="{{ url_for('login') }}">Login</a></li>
+            {% endif %}
+          </ul>
         </div>
-    </nav>
+      </nav>
+      
 
     <main class="container main-content">
         {% with messages = get_flashed_messages(with_categories=true) %}
