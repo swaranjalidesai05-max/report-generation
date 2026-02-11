@@ -19,7 +19,7 @@
             {% if session.user_id %}
               <li><a href="{{ url_for('add_event') }}">Add Event</a></li>
               <li><a href="{{ url_for('reports') }}">Reports</a></li>
-              <li><a href="{{ url_for('logout') }}">Logout ({{ session.username }})</a></li>
+              <li><a href="{{ url_for('logout') }}">Logout ({{ session.username }}{% if session.role %} - {{ session.role }}{% endif %})</a></li>
             {% else %}
               <li><a href="{{ url_for('login') }}">Login</a></li>
             {% endif %}
@@ -47,5 +47,8 @@
             <p>&copy; 2025 College Event Report Generation System. All rights reserved.</p>
         </div>
     </footer>
+
+    {# Global JS libraries #}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

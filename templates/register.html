@@ -19,6 +19,15 @@
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
+            <div class="form-group">
+                <label for="role">Register As</label>
+                <select id="role" name="role" required>
+                    <option value="Student">Student</option>
+                    <option value="Faculty">Faculty</option>
+                    <option value="HOD">HOD (Head of Department)</option>
+                </select>
+                <small>Select your role</small>
+            </div>
             <button type="submit" class="btn btn-primary">Register</button>
         </form>
         <p class="auth-footer">Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>

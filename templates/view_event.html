@@ -14,6 +14,12 @@
         
         <div class="event-details-grid">
             <div class="detail-item">
+                <strong>Event ID:</strong> {{ event.id }}
+            </div>
+            <div class="detail-item">
+                <strong>Academic Year:</strong> {{ event.academic_year or 'Not specified' }}
+            </div>
+            <div class="detail-item">
                 <strong>Date:</strong> {{ event.date }}
             </div>
             <div class="detail-item">
@@ -28,41 +34,87 @@
             <div class="detail-item">
                 <strong>Event Type:</strong> {{ event.event_type or 'Not specified' }}
             </div>
-            <div class="detail-item">
-                <strong>Academic Year:</strong> {{ event.academic_year or 'Not specified' }}
-            </div>
         </div>
 
-        {% if event.resource_person %}
         <div class="detail-section">
             <h4>Resource Person Details</h4>
-            <p><strong>Name:</strong> {{ event.resource_person }}</p>
-            {% if event.resource_designation %}
-            <p><strong>Designation:</strong> {{ event.resource_designation }}</p>
-            {% endif %}
-            {% if event.event_coordinator %}
-            <p><strong>Event Coordinator:</strong> {{ event.event_coordinator }}</p>
-            {% endif %}
+            <p><strong>Name:</strong> {{ event.resource_person or 'Not specified' }}</p>
+            <p><strong>Designation:</strong> {{ event.resource_designation or 'Not specified' }}</p>
+            <p><strong>Event Coordinator:</strong> {{ event.event_coordinator or 'Not specified' }}</p>
         </div>
-        {% endif %}
 
-        {% if event.description %}
         <div class="detail-section">
             <h4>Description</h4>
-            <p>{{ event.description }}</p>
+            <p>{{ event.description or 'No description provided' }}</p>
         </div>
-        {% endif %}
 
-        {% if event.outcome_1 or event.outcome_2 or event.outcome_3 %}
         <div class="detail-section">
             <h4>Outcomes</h4>
             <ul>
-                {% if event.outcome_1 %}<li>{{ event.outcome_1 }}</li>{% endif %}
-                {% if event.outcome_2 %}<li>{{ event.outcome_2 }}</li>{% endif %}
-                {% if event.outcome_3 %}<li>{{ event.outcome_3 }}</li>{% endif %}
+                <li><strong>Outcome 1:</strong> {{ event.outcome_1 or 'Not specified' }}</li>
+                <li><strong>Outcome 2:</strong> {{ event.outcome_2 or 'Not specified' }}</li>
+                <li><strong>Outcome 3:</strong> {{ event.outcome_3 or 'Not specified' }}</li>
             </ul>
         </div>
+        
+        {% if feedback and feedback|length > 0 %}
+        <div class="detail-section">
+            <h4>Feedback</h4>
+            <table class="feedback-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Rating</th>
+                        <th>Comment</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fb in feedback %}
+                    <tr>
+                        <td>{{ fb.name or 'N/A' }}</td>
+                        <td>{{ fb.rating or 'N/A' }}</td>
+                        <td>{{ fb.comment or 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% endif %}
+        
+        <div class="detail-section">
+            <h4>Uploaded Documents</h4>
+            <div class="document-list">
+                {% if event.permission_letter %}
+                <p><strong>Permission Letter:</strong> <a href="/{{ event.permission_letter }}" target="_blank">View</a></p>
+                {% else %}
+                <p><strong>Permission Letter:</strong> Not uploaded</p>
+                {% endif %}
+                
+                {% if event.invitation_letter %}
+                <p><strong>Invitation Letter:</strong> <a href="/{{ event.invitation_letter }}" target="_blank">View</a></p>
+                {% else %}
+                <p><strong>Invitation Letter:</strong> Not uploaded</p>
+                {% endif %}
+                
+                {% if event.notice_letter %}
+                <p><strong>Notice Letter:</strong> <a href="/{{ event.notice_letter }}" target="_blank">View</a></p>
+                {% else %}
+                <p><strong>Notice Letter:</strong> Not uploaded</p>
+                {% endif %}
+                
+                {% if event.appreciation_letter %}
+                <p><strong>Appreciation Letter:</strong> <a href="/{{ event.appreciation_letter }}" target="_blank">View</a></p>
+                {% else %}
+                <p><strong>Appreciation Letter:</strong> Not uploaded</p>
+                {% endif %}
+                
+                {% if event.attendance_photo %}
+                <p><strong>Attendance Sheet:</strong> <a href="/{{ event.attendance_photo }}" target="_blank">View</a></p>
+                {% else %}
+                <p><strong>Attendance Sheet:</strong> Not uploaded</p>
+                {% endif %}
+            </div>
+        </div>
 
         {% if photos and photos|length > 0 %}
         <div class="detail-section">
@@ -79,6 +131,7 @@
 
         <div class="event-actions">
             <a href="{{ url_for('generate_report', event_id=event.id) }}" class="btn btn-primary">Generate Report</a>
+            <a href="{{ url_for('add_event', event_id=event.id) }}" class="btn btn-secondary">Edit Event</a>
         </div>
     </div>
 </div>
@@ -155,6 +208,48 @@
     margin-top: 2rem;
     padding-top: 1.5rem;
     border-top: 2px solid #e0e0e0;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.feedback-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.feedback-table th,
+.feedback-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.feedback-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.feedback-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.document-list p {
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.document-list a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+.document-list a:hover {
+    text-decoration: underline;
 }
 </style>
 {% endblock %}

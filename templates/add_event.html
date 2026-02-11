@@ -1,82 +1,86 @@
 {% extends "base.html" %}
 
-{% block title %}Add Event - College Event Report System{% endblock %}
+{% block title %}{% if event_id %}Edit Event{% else %}Add Event{% endif %} - College Event Report System{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>Add New Event</h2>
+    <h2>{% if event_id %}Edit Event{% else %}Add New Event{% endif %}</h2>
 </div>
 
 <div class="form-container">
     <form method="POST" action="{{ url_for('add_event') }}" enctype="multipart/form-data">
+        {% if event_id %}
+        <input type="hidden" name="event_id" value="{{ event_id }}">
+        {% endif %}
+        
         <div class="form-group">
             <label for="title">Event Title *</label>
-            <input type="text" id="title" name="title" required>
+            <input type="text" id="title" name="title" value="{{ event.title if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="date">Event Date *</label>
-            <input type="date" id="date" name="date" required>
+            <input type="date" id="date" name="date" value="{{ event.date if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="venue">Venue *</label>
-            <input type="text" id="venue" name="venue" required>
+            <input type="text" id="venue" name="venue" value="{{ event.venue if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="department">Department *</label>
-            <input type="text" id="department" name="department" required>
+            <input type="text" id="department" name="department" value="{{ event.department if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="description">Event Description</label>
-            <textarea id="description" name="description" rows="5"></textarea>
+            <textarea id="description" name="description" rows="5">{{ event.description if event else '' }}</textarea>
         </div>
         
         <div class="form-group">
             <label for="academic_year">Academic Year *</label>
-            <input type="text" id="academic_year" name="academic_year" placeholder="2025-26" required>
+            <input type="text" id="academic_year" name="academic_year" placeholder="2025-26" value="{{ event.academic_year if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="resource_person">Resource Person Name *</label>
-            <input type="text" id="resource_person" name="resource_person" required>
+            <input type="text" id="resource_person" name="resource_person" value="{{ event.resource_person if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="resource_designation">Designation</label>
-            <input type="text" id="resource_designation" name="resource_designation">
+            <input type="text" id="resource_designation" name="resource_designation" value="{{ event.resource_designation if event else '' }}">
         </div>
         
         <div class="form-group">
             <label for="event_coordinator">Event Coordinator</label>
-            <input type="text" id="event_coordinator" name="event_coordinator">
+            <input type="text" id="event_coordinator" name="event_coordinator" value="{{ event.event_coordinator if event else '' }}">
         </div>
         
         <div class="form-group">
             <label for="event_time">Event Time *</label>
-            <input type="time" id="event_time" name="event_time" required>
+            <input type="time" id="event_time" name="event_time" value="{{ event.event_time if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="event_type">Event Type</label>
             <select id="event_type" name="event_type">
                 <option value="">Select Event Type</option>
-                <option value="Expert Session">Expert Session</option>
-                <option value="Workshop">Workshop</option>
-                <option value="Seminar">Seminar</option>
-                <option value="Webinar">Webinar</option>
-                <option value="Guest Lectures">Guest Lectures</option>
-                <option value="Orientation Program">Orientation Program</option>
-                <option value="Student Activities">Student Activities</option>
-                <option value="Convocation">Convocation</option>
-                <option value="Co-curricular Activities">Co-curricular Activities</option>
-                <option value="Cultural Activities">Cultural Activities</option>
-                <option value="Sports">Sports</option>
-                <option value="Fests">Fests</option>
-                <option value="Inter / Intra-College Competition">Inter / Intra-College Competition</option>
-                <option value="Other">Other</option>
+                <option value="Expert Session" {% if event and event.event_type == 'Expert Session' %}selected{% endif %}>Expert Session</option>
+                <option value="Workshop" {% if event and event.event_type == 'Workshop' %}selected{% endif %}>Workshop</option>
+                <option value="Seminar" {% if event and event.event_type == 'Seminar' %}selected{% endif %}>Seminar</option>
+                <option value="Webinar" {% if event and event.event_type == 'Webinar' %}selected{% endif %}>Webinar</option>
+                <option value="Guest Lectures" {% if event and event.event_type == 'Guest Lectures' %}selected{% endif %}>Guest Lectures</option>
+                <option value="Orientation Program" {% if event and event.event_type == 'Orientation Program' %}selected{% endif %}>Orientation Program</option>
+                <option value="Student Activities" {% if event and event.event_type == 'Student Activities' %}selected{% endif %}>Student Activities</option>
+                <option value="Convocation" {% if event and event.event_type == 'Convocation' %}selected{% endif %}>Convocation</option>
+                <option value="Co-curricular Activities" {% if event and event.event_type == 'Co-curricular Activities' %}selected{% endif %}>Co-curricular Activities</option>
+                <option value="Cultural Activities" {% if event and event.event_type == 'Cultural Activities' %}selected{% endif %}>Cultural Activities</option>
+                <option value="Sports" {% if event and event.event_type == 'Sports' %}selected{% endif %}>Sports</option>
+                <option value="Fests" {% if event and event.event_type == 'Fests' %}selected{% endif %}>Fests</option>
+                <option value="Inter / Intra-College Competition" {% if event and event.event_type == 'Inter / Intra-College Competition' %}selected{% endif %}>Inter / Intra-College Competition</option>
+                <option value="Other" {% if event and event.event_type == 'Other' %}selected{% endif %}>Other</option>
             </select>
         </div>
         
@@ -112,17 +116,33 @@
         
         <div class="form-group">
             <label for="outcome_1">Outcome 1 *</label>
-            <input type="text" id="outcome_1" name="outcome_1" required>
+            <input type="text" id="outcome_1" name="outcome_1" value="{{ event.outcome_1 if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="outcome_2">Outcome 2 *</label>
-            <input type="text" id="outcome_2" name="outcome_2" required>
+            <input type="text" id="outcome_2" name="outcome_2" value="{{ event.outcome_2 if event else '' }}" required>
         </div>
         
         <div class="form-group">
             <label for="outcome_3">Outcome 3</label>
-            <input type="text" id="outcome_3" name="outcome_3">
+            <input type="text" id="outcome_3" name="outcome_3" value="{{ event.outcome_3 if event else '' }}">
+        </div>
+
+        <div class="form-group">
+            <label>Programme Specific Outcomes (PSO) *</label>
+            <div>
+                <label style="display: block; margin-bottom: 0.25rem;">
+                    <input type="checkbox" name="pso1_selected" value="1"
+                        {% if event and event.pso1_selected %}checked{% endif %}>
+                    PSO1: An ability to apply the theoretical concepts and practical knowledge of Information Technology in the analysis, design, development, and management of information processing systems and applications in the interdisciplinary domain to understand the professional, business and business processes, ethical, legal, security and social issues and responsibilities.
+                </label><br>
+                <label style="display: block;">
+                    <input type="checkbox" name="pso2_selected" value="1"
+                        {% if event and event.pso2_selected %}checked{% endif %}>
+                    PSO2:An ability to analyze a problem and identify and define the computing infrastructure and operations requirements appropriate to its solution. IT graduates should be able to work on large-scale computing systems.
+                </label>
+            </div>
         </div>
         
         <div class="form-group">
@@ -133,44 +153,47 @@
         
         <div class="form-group">
             <label>Feedback Inputs</label>
+            {% set fb1 = feedback_list[0] if feedback_list and feedback_list|length > 0 else {} %}
+            {% set fb2 = feedback_list[1] if feedback_list and feedback_list|length > 1 else {} %}
+            
             <div class="form-group" style="margin-top: 1rem;">
                 <label for="feedback_name_1">Feedback Name</label>
-                <input type="text" id="feedback_name_1" name="feedback_name[]">
+                <input type="text" id="feedback_name_1" name="feedback_name[]" value="{{ fb1.name if fb1.name else '' }}">
             </div>
             <div class="form-group">
                 <label for="feedback_rating_1">Feedback Rating</label>
                 <select id="feedback_rating_1" name="feedback_rating[]">
                     <option value="">Select Rating</option>
-                    <option value="Excellent">Excellent</option>
-                    <option value="Very Good">Very Good</option>
-                    <option value="Good">Good</option>
+                    <option value="Excellent" {% if fb1.rating == 'Excellent' %}selected{% endif %}>Excellent</option>
+                    <option value="Very Good" {% if fb1.rating == 'Very Good' %}selected{% endif %}>Very Good</option>
+                    <option value="Good" {% if fb1.rating == 'Good' %}selected{% endif %}>Good</option>
                 </select>
             </div>
             <div class="form-group">
                 <label for="feedback_comment_1">Feedback Comment</label>
-                <textarea id="feedback_comment_1" name="feedback_comment[]" rows="3"></textarea>
+                <textarea id="feedback_comment_1" name="feedback_comment[]" rows="3">{{ fb1.comment if fb1.comment else '' }}</textarea>
             </div>
             <div class="form-group" style="margin-top: 1.5rem;">
                 <label for="feedback_name_2">Feedback Name</label>
-                <input type="text" id="feedback_name_2" name="feedback_name[]">
+                <input type="text" id="feedback_name_2" name="feedback_name[]" value="{{ fb2.name if fb2.name else '' }}">
             </div>
             <div class="form-group">
                 <label for="feedback_rating_2">Feedback Rating</label>
                 <select id="feedback_rating_2" name="feedback_rating[]">
                     <option value="">Select Rating</option>
-                    <option value="Excellent">Excellent</option>
-                    <option value="Very Good">Very Good</option>
-                    <option value="Good">Good</option>
+                    <option value="Excellent" {% if fb2.rating == 'Excellent' %}selected{% endif %}>Excellent</option>
+                    <option value="Very Good" {% if fb2.rating == 'Very Good' %}selected{% endif %}>Very Good</option>
+                    <option value="Good" {% if fb2.rating == 'Good' %}selected{% endif %}>Good</option>
                 </select>
             </div>
             <div class="form-group">
                 <label for="feedback_comment_2">Feedback Comment</label>
-                <textarea id="feedback_comment_2" name="feedback_comment[]" rows="3"></textarea>
+                <textarea id="feedback_comment_2" name="feedback_comment[]" rows="3">{{ fb2.comment if fb2.comment else '' }}</textarea>
             </div>
         </div>
         
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Add Event</button>
+            <button type="submit" class="btn btn-primary">{% if event_id %}Update Event{% else %}Add Event{% endif %}</button>
             <a href="{{ url_for('events') }}" class="btn btn-secondary">Cancel</a>
         </div>
     </form>

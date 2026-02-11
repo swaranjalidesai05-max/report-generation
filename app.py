@@ -1,4 +1,14 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    send_file,
+    jsonify,
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -10,6 +20,7 @@ from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
+
 app = Flask(__name__)
 app.secret_key = "change-this-secret"
 
@@ -18,6 +29,22 @@ UPLOAD_FOLDER = "static"
 TEMPLATE_PATH = "word_templates/college_letterhead.docx"
 GENERATED_FOLDER = "generated_reports"
 
+# ---------------- PSO CONSTANTS ----------------
+# Programme Specific Outcomes text used in generated reports.
+PSO1_TEXT = (
+    "PSO1: An ability to apply the theoretical concepts and practical knowledge of "
+    "Information Technology in the analysis, design, development, and management of "
+    "information processing systems and applications in the interdisciplinary domain "
+    "to understand professional, business processes, ethical, legal, security, and "
+    "social issues and responsibilities."
+)
+
+PSO2_TEXT = (
+    "PSO2: An ability to analyze a problem and identify and define the computing "
+    "infrastructure and operations requirements appropriate to its solution. IT "
+    "graduates should be able to work on large-scale computing systems."
+)
+
 
 # ---------------- DATABASE ----------------
 
@@ -25,7 +52,7 @@ def init_db():
     conn = sqlite3.connect("database.db")
     c = conn.cursor()
 
-    # Users table (with email)
+    # Users table (with email and role)
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -37,11 +64,16 @@ def init_db():
         """
     )
 
-    # Ensure email column exists on old databases
+    # Ensure email / role columns exist on old databases
     c.execute("PRAGMA table_info(users)")
     user_cols = [row[1] for row in c.fetchall()]
     if "email" not in user_cols:
         c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    if "role" not in user_cols:
+        # Default everyone to 'Student' unless explicitly changed later
+        c.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'Student'")
+        # Backfill any existing rows to have a role
+        c.execute("UPDATE users SET role='Student' WHERE role IS NULL OR role=''")
 
     # Events table – stores all event metadata
     c.execute(
@@ -69,7 +101,9 @@ def init_db():
             outcome_1 TEXT,
             outcome_2 TEXT,
             outcome_3 TEXT,
-            feedback_data TEXT
+            feedback_data TEXT,
+            pso1_selected INTEGER DEFAULT 0,
+            pso2_selected INTEGER DEFAULT 0
         )
         """
     )
@@ -95,6 +129,8 @@ def init_db():
         ("outcome_2", "TEXT"),
         ("outcome_3", "TEXT"),
         ("feedback_data", "TEXT"),
+        ("pso1_selected", "INTEGER DEFAULT 0"),
+        ("pso2_selected", "INTEGER DEFAULT 0"),
     ]
     for col_name, col_type in new_event_columns:
         if col_name not in event_cols:
@@ -111,6 +147,14 @@ def init_db():
         )
         """
     )
+
+    # Ensure newer analytics-related columns exist on old databases
+    c.execute("PRAGMA table_info(reports)")
+    report_cols = [row[1] for row in c.fetchall()]
+    if "status" not in report_cols:
+        # Basic lifecycle tracking for reports; default everything to 'submitted'
+        c.execute("ALTER TABLE reports ADD COLUMN status TEXT DEFAULT 'submitted'")
+        c.execute("UPDATE reports SET status='submitted' WHERE status IS NULL OR status=''")
 
     conn.commit()
     conn.close()
@@ -154,6 +198,23 @@ def login_required(f):
         if "user_id" not in session:
             return redirect(url_for("login"))
         return f(*args, **kwargs)
+    return wrap
+
+
+def hod_required_api(f):
+    """
+    Simple decorator for HOD-only JSON APIs.
+    Assumes user is already authenticated via @login_required.
+    """
+    from functools import wraps
+
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if session.get("role") != "HOD":
+            # Return a JSON 403 so frontend can handle gracefully
+            return jsonify({"error": "Forbidden", "message": "HOD access required"}), 403
+        return f(*args, **kwargs)
+
     return wrap
 
 
@@ -220,7 +281,6 @@ def insert_event_details_paragraph(doc, marker, event):
                 ("Event Coordinator", event["event_coordinator"]),
             ]
 
-            # 🔥 IMPORTANT: insert BEFORE marker paragraph
             for label, value in reversed(fields):
                 para = p.insert_paragraph_before()
                 para.alignment = WD_ALIGN_PARAGRAPH.LEFT
@@ -401,6 +461,7 @@ def register():
         username = request.form["username"]
         email = request.form.get("email", "")
         password = request.form["password"]
+        role = request.form.get("role", "Student")  # Get selected role from form
 
         conn = get_db()
         existing = conn.execute(
@@ -413,12 +474,12 @@ def register():
 
         hashed = generate_password_hash(password)
         conn.execute(
-            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-            (username, email, hashed),
+            "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
+            (username, email, hashed, role),
         )
         conn.commit()
         conn.close()
-        flash("Registration successful. Please login.")
+        flash(f"Registration successful as {role}. Please login.")
         return redirect(url_for("login"))
 
     return render_template("register.html")
@@ -429,6 +490,7 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
+        selected_role = request.form.get("role", "Student")  # Get selected role from form
 
         conn = get_db()
         user = conn.execute(
@@ -437,10 +499,19 @@ def login():
         conn.close()
 
         if user and check_password_hash(user["password"], password):
+            # Get user's actual role from database
+            user_role = user["role"] if "role" in user.keys() and user["role"] else "Student"
+            
+            # Verify that the selected role matches the user's role in database
+            if selected_role != user_role:
+                flash(f"Invalid role selection. Your account is registered as '{user_role}'. Please select the correct role.")
+                return render_template("login.html")
+            
             session["user_id"] = user["id"]
             session["username"] = user["username"]
+            session["role"] = user_role
             return redirect(url_for("events"))
-        flash("Invalid login")
+        flash("Invalid username or password")
 
     return render_template("login.html")
 
@@ -478,6 +549,20 @@ def events():
 @app.route("/add_event", methods=["GET", "POST"])
 @login_required
 def add_event():
+    # Check if this is an edit request (event_id in query params or form)
+    event_id = request.args.get("event_id", type=int) or request.form.get("event_id", type=int)
+    event = None
+    
+    # Load existing event data if editing
+    if event_id:
+        conn = get_db()
+        event = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+        conn.close()
+        if not event:
+            flash("Event not found.")
+            return redirect(url_for("events"))
+        event = dict(event)  # Convert to dict for easier access
+    
     if request.method == "POST":
         title = request.form["title"]
         date = request.form["date"]
@@ -494,32 +579,58 @@ def add_event():
         outcome_2 = request.form.get("outcome_2", "")
         outcome_3 = request.form.get("outcome_3", "")
 
-        # Event photos (multiple)
+        # PSO selections from form (checkboxes). Store as integers 0/1 in DB.
+        pso1_selected = 1 if request.form.get("pso1_selected") else 0
+        pso2_selected = 1 if request.form.get("pso2_selected") else 0
+
+        # Validate: At least one PSO must be selected.
+        if not (pso1_selected or pso2_selected):
+            flash("Please select at least one Programme Specific Outcome (PSO1 and/or PSO2).")
+            # Redirect back to the same form (preserves event_id for edit flows)
+            if event_id:
+                return redirect(url_for("add_event", event_id=event_id))
+            return redirect(url_for("add_event"))
+
+        # Event photos (multiple) - preserve existing if no new uploads
         event_photos_paths = []
         if "event_photos" in request.files:
             for f in request.files.getlist("event_photos"):
-                saved = _save_file(f, "event_photos", allow_pdf=False)
-                if saved:
-                    event_photos_paths.append(saved)
+                if f.filename:  # Only process if file was actually uploaded
+                    saved = _save_file(f, "event_photos", allow_pdf=False)
+                    if saved:
+                        event_photos_paths.append(saved)
+        
+        # If editing and no new photos uploaded, keep existing photos
+        if event_id and not event_photos_paths and event:
+            try:
+                existing_photos = json.loads(event["event_photos"]) if event.get("event_photos") else []
+                if isinstance(existing_photos, list):
+                    event_photos_paths = existing_photos
+            except (json.JSONDecodeError, TypeError):
+                pass
 
         event_photo_cover = event_photos_paths[0] if event_photos_paths else None
 
-        # Scanned documents and attendance
+        # Scanned documents and attendance - preserve existing if no new uploads
         permission_letter = _save_file(
             request.files.get("permission_letter"), "attendance_photos", allow_pdf=True
-        )
+        ) or (event["permission_letter"] if event_id and event else None)
+        
         invitation_letter = _save_file(
             request.files.get("invitation_letter"), "attendance_photos", allow_pdf=True
-        )
+        ) or (event["invitation_letter"] if event_id and event else None)
+        
         notice_letter = _save_file(
             request.files.get("notice_letter"), "attendance_photos", allow_pdf=True
-        )
+        ) or (event["notice_letter"] if event_id and event else None)
+        
         appreciation_letter = _save_file(
             request.files.get("appreciation_letter"), "attendance_photos", allow_pdf=True
-        )
+        ) or (event["appreciation_letter"] if event_id and event else None)
+        
         attendance_photo = _save_file(
             request.files.get("attendance_photo"), "attendance_photos", allow_pdf=True
-        )
+        ) or (event["attendance_photo"] if event_id and event else None)
 
         # Feedback
         feedback_names = request.form.getlist("feedback_name[]")
@@ -541,51 +652,111 @@ def add_event():
                 )
 
         conn = get_db()
-        conn.execute(
-            """
-            INSERT INTO events (
-                title, date, venue, department, description,
-                event_photo, academic_year, resource_person,
-                resource_designation, event_coordinator,
-                event_time, event_type,
-                permission_letter, invitation_letter, notice_letter,
-                appreciation_letter, event_photos, attendance_photo,
-                outcome_1, outcome_2, outcome_3, feedback_data
+        
+        # UPDATE if editing, INSERT if creating new
+        if event_id:
+            # Update existing event
+            conn.execute(
+                """
+                UPDATE events SET
+                    title=?, date=?, venue=?, department=?, description=?,
+                    event_photo=?, academic_year=?, resource_person=?,
+                    resource_designation=?, event_coordinator=?,
+                    event_time=?, event_type=?,
+                    permission_letter=?, invitation_letter=?, notice_letter=?,
+                    appreciation_letter=?, event_photos=?, attendance_photo=?,
+                    outcome_1=?, outcome_2=?, outcome_3=?, feedback_data=?,
+                    pso1_selected=?, pso2_selected=?
+                WHERE id=?
+                """,
+                (
+                    title,
+                    date,
+                    venue,
+                    department,
+                    description,
+                    event_photo_cover,
+                    academic_year,
+                    resource_person,
+                    resource_designation,
+                    event_coordinator,
+                    event_time,
+                    event_type,
+                    permission_letter,
+                    invitation_letter,
+                    notice_letter,
+                    appreciation_letter,
+                    json.dumps(event_photos_paths) if event_photos_paths else None,
+                    attendance_photo,
+                    outcome_1,
+                    outcome_2,
+                    outcome_3,
+                    json.dumps(feedback_data) if feedback_data else None,
+                    pso1_selected,
+                    pso2_selected,
+                    event_id,
+                ),
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                title,
-                date,
-                venue,
-                department,
-                description,
-                event_photo_cover,
-                academic_year,
-                resource_person,
-                resource_designation,
-                event_coordinator,
-                event_time,
-                event_type,
-                permission_letter,
-                invitation_letter,
-                notice_letter,
-                appreciation_letter,
-                json.dumps(event_photos_paths) if event_photos_paths else None,
-                attendance_photo,
-                outcome_1,
-                outcome_2,
-                outcome_3,
-                json.dumps(feedback_data) if feedback_data else None,
-            ),
-        )
+            flash("Event updated successfully.")
+        else:
+            # Insert new event
+            conn.execute(
+                """
+                INSERT INTO events (
+                    title, date, venue, department, description,
+                    event_photo, academic_year, resource_person,
+                    resource_designation, event_coordinator,
+                    event_time, event_type,
+                    permission_letter, invitation_letter, notice_letter,
+                    appreciation_letter, event_photos, attendance_photo,
+                    outcome_1, outcome_2, outcome_3, feedback_data,
+                    pso1_selected, pso2_selected
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    title,
+                    date,
+                    venue,
+                    department,
+                    description,
+                    event_photo_cover,
+                    academic_year,
+                    resource_person,
+                    resource_designation,
+                    event_coordinator,
+                    event_time,
+                    event_type,
+                    permission_letter,
+                    invitation_letter,
+                    notice_letter,
+                    appreciation_letter,
+                    json.dumps(event_photos_paths) if event_photos_paths else None,
+                    attendance_photo,
+                    outcome_1,
+                    outcome_2,
+                    outcome_3,
+                    json.dumps(feedback_data) if feedback_data else None,
+                    pso1_selected,
+                    pso2_selected,
+                ),
+            )
+            flash("Event added successfully.")
+        
         conn.commit()
         conn.close()
-
-        flash("Event added successfully.")
         return redirect(url_for("events"))
 
-    return render_template("add_event.html")
+    # GET request - render form with existing data if editing
+    # Parse feedback data if editing
+    feedback_list = []
+    if event and event.get("feedback_data"):
+        try:
+            feedback_list = json.loads(event["feedback_data"])
+        except (json.JSONDecodeError, TypeError):
+            feedback_list = []
+    
+    return render_template("add_event.html", event=event, event_id=event_id, feedback_list=feedback_list)
 
 @app.route("/event/<int:event_id>")
 @login_required
@@ -601,8 +772,30 @@ def view_event(event_id):
         return redirect(url_for("events"))
 
     photos = json.loads(event["event_photos"]) if event["event_photos"] else []
+    feedback = json.loads(event["feedback_data"]) if event["feedback_data"] else []
 
-    return render_template("view_event.html", event=event, photos=photos)
+    return render_template("view_event.html", event=dict(event), photos=photos, feedback=feedback)
+
+
+@app.route("/delete_event/<int:event_id>", methods=["POST"])
+@login_required
+def delete_event(event_id):
+    """Delete an event from the database."""
+    conn = get_db()
+    event = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+    
+    if not event:
+        conn.close()
+        flash("Event not found.")
+        return redirect(url_for("events"))
+    
+    # Delete the event
+    conn.execute("DELETE FROM events WHERE id=?", (event_id,))
+    conn.commit()
+    conn.close()
+    
+    flash("Event deleted successfully.")
+    return redirect(url_for("events"))
 
 @app.route("/generate_report/<int:event_id>")
 @login_required
@@ -616,7 +809,19 @@ def generate_report(event_id):
         flash("Event not found")
         return redirect(url_for("events"))
 
+    # Convert sqlite3.Row to plain dict so we can safely use .get()
+    event = dict(event)
+
     doc = Document(TEMPLATE_PATH)
+
+    # Build PSO section text based on selected PSOs for this event.
+    # This will replace the {{PSO_SECTION}} placeholder in the template.
+    selected_psos = []
+    if event.get("pso1_selected"):
+        selected_psos.append(PSO1_TEXT)
+    if event.get("pso2_selected"):
+        selected_psos.append(PSO2_TEXT)
+    pso_section_text = "\n\n".join(selected_psos)
 
     replace_placeholders(doc, {
         "{{academic_year}}": event["academic_year"],
@@ -637,6 +842,7 @@ def generate_report(event_id):
         "{{outcome_1}}": event["outcome_1"],
         "{{outcome_2}}": event["outcome_2"],
         "{{outcome_3}}": event["outcome_3"],
+        "{{PSO_SECTION}}": pso_section_text,
     })
 
     insert_event_details_paragraph(doc, "<<EVENT_DETAILS>>", event)
@@ -661,7 +867,9 @@ def generate_report(event_id):
     # Store report metadata
     conn = get_db()
     conn.execute(
-        "INSERT INTO reports (event_id, file_path) VALUES (?, ?)", (event_id, path)
+        # status column has a default ('submitted'), but be explicit for clarity.
+        "INSERT INTO reports (event_id, file_path, status) VALUES (?, ?, ?)",
+        (event_id, path, "submitted"),
     )
     conn.commit()
     conn.close()
@@ -714,6 +922,74 @@ def download_report(report_id):
         flash("Report file not found.")
         return redirect(url_for("reports"))
     return send_file(row["file_path"], as_attachment=True)
+
+
+@app.route("/api/hod/department-analysis")
+@login_required
+@hod_required_api
+def hod_department_analysis_api():
+    """
+    Returns aggregated, department-wise report analytics for HOD users.
+
+    Output format (example):
+    {
+        "departments": [
+            {
+                "department": "CSE",
+                "total_reports": 10,
+                "status_counts": {
+                    "submitted": 5,
+                    "approved": 3,
+                    "rejected": 1,
+                    "pending": 1
+                }
+            },
+            ...
+        ]
+    }
+    """
+    conn = get_db()
+
+    # Aggregate per department and per status. We keep the schema flexible while
+    # still returning a shape that is easy for charting libraries to consume.
+    rows = conn.execute(
+        """
+        SELECT
+            e.department AS department,
+            r.status     AS status,
+            COUNT(r.id)  AS count
+        FROM reports r
+        JOIN events e ON r.event_id = e.id
+        GROUP BY e.department, r.status
+        ORDER BY e.department
+        """
+    ).fetchall()
+    conn.close()
+
+    # Build nested structure: department -> status_counts + total
+    departments = {}
+    for row in rows:
+        dept = row["department"] or "Unknown"
+        status = row["status"] or "unknown"
+        count = row["count"] or 0
+
+        if dept not in departments:
+            departments[dept] = {
+                "department": dept,
+                "total_reports": 0,
+                "status_counts": {},
+            }
+        departments[dept]["status_counts"][status] = (
+            departments[dept]["status_counts"].get(status, 0) + count
+        )
+        departments[dept]["total_reports"] += count
+
+    # Sorted list is a bit nicer for charts/UX
+    department_list = sorted(
+        departments.values(), key=lambda d: d["department"].lower()
+    )
+
+    return jsonify({"departments": department_list})
 
 
 # ---------------- START ----------------

@@ -41,4 +41,184 @@
         <p>No reports generated yet. <a href="{{ url_for('events') }}">Generate your first report</a></p>
     </div>
 {% endif %}
+
+{# ---------------- HOD Department Analysis (visible only for HOD users) ---------------- #}
+{% if session.role == 'HOD' %}
+<div class="page-header" style="margin-top: 2rem;">
+    <h2>Department Analysis (HOD)</h2>
+</div>
+
+<section id="hod-analysis" class="hod-analysis-section">
+    <div id="hod-loading" class="info-text">
+        Loading department-wise analytics...
+    </div>
+    <div id="hod-empty" class="info-text" style="display: none;">
+        No reports available for department-wise analysis yet.
+    </div>
+    <div id="hod-error" class="info-text error-text" style="display: none;">
+        Unable to load analytics. Please try again later.
+    </div>
+
+    <div id="hod-charts" class="hod-charts" style="display: none;">
+        <div class="chart-container">
+            <h3>Department vs Total Reports</h3>
+            <canvas id="deptTotalChart"></canvas>
+        </div>
+
+        <div class="chart-container">
+            <h3>Report Status Distribution per Department</h3>
+            <canvas id="deptStatusChart"></canvas>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const hodSection = document.getElementById("hod-analysis");
+    if (!hodSection || typeof Chart === "undefined") {
+        return;
+    }
+
+    const loadingEl = document.getElementById("hod-loading");
+    const emptyEl = document.getElementById("hod-empty");
+    const errorEl = document.getElementById("hod-error");
+    const chartsEl = document.getElementById("hod-charts");
+
+    function showState({ loading = false, empty = false, error = false, charts = false }) {
+        loadingEl.style.display = loading ? "block" : "none";
+        emptyEl.style.display = empty ? "block" : "none";
+        errorEl.style.display = error ? "block" : "none";
+        chartsEl.style.display = charts ? "block" : "none";
+    }
+
+    showState({ loading: true });
+
+    fetch("{{ url_for('hod_department_analysis_api') }}", {
+        headers: {
+            "Accept": "application/json"
+        }
+    })
+        .then(function (res) {
+            if (res.status === 403) {
+                // User lost HOD permissions or is not allowed anymore
+                showState({ error: true });
+                errorEl.textContent = "You do not have permission to view this analytics.";
+                return null;
+            }
+            if (!res.ok) {
+                throw new Error("Network error");
+            }
+            return res.json();
+        })
+        .then(function (data) {
+            if (!data) {
+                return;
+            }
+
+            const departments = data.departments || [];
+            if (!departments.length) {
+                showState({ empty: true });
+                return;
+            }
+
+            const labels = departments.map(function (d) { return d.department; });
+            const totals = departments.map(function (d) { return d.total_reports || 0; });
+
+            // ---- Total reports bar chart ----
+            const totalCtx = document.getElementById("deptTotalChart").getContext("2d");
+            new Chart(totalCtx, {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: "Total Reports",
+                        data: totals,
+                        backgroundColor: "rgba(54, 162, 235, 0.6)",
+                        borderColor: "rgba(54, 162, 235, 1)",
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+
+            // ---- Status distribution stacked bar chart ----
+            // Collect all statuses that appear in data
+            const statusSet = {};
+            departments.forEach(function (dept) {
+                const statusCounts = dept.status_counts || {};
+                Object.keys(statusCounts).forEach(function (status) {
+                    statusSet[status] = true;
+                });
+            });
+
+            const statuses = Object.keys(statusSet).sort();
+
+            const statusColors = [
+                "rgba(75, 192, 192, 0.7)",
+                "rgba(255, 159, 64, 0.7)",
+                "rgba(255, 99, 132, 0.7)",
+                "rgba(153, 102, 255, 0.7)",
+                "rgba(255, 206, 86, 0.7)"
+            ];
+
+            const statusDatasets = statuses.map(function (status, idx) {
+                return {
+                    label: status,
+                    data: departments.map(function (dept) {
+                        const statusCounts = dept.status_counts || {};
+                        return statusCounts[status] || 0;
+                    }),
+                    backgroundColor: statusColors[idx % statusColors.length],
+                    stack: "status"
+                };
+            });
+
+            const statusCtx = document.getElementById("deptStatusChart").getContext("2d");
+            new Chart(statusCtx, {
+                type: "bar",
+                data: {
+                    labels: labels,
+                    datasets: statusDatasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        tooltip: {
+                            mode: "index",
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+
+            showState({ charts: true });
+        })
+        .catch(function () {
+            showState({ error: true });
+        });
+});
+</script>
+{% endif %}
 {% endblock %}

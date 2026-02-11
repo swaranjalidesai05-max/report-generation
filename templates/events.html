@@ -69,6 +69,19 @@ Events - College Event Report System
                     View Details
                 </a>
 
+                <a href="{{ url_for('add_event', event_id=event.id) }}"
+                   class="btn btn-small" style="background-color: #f39c12; color: white;">
+                    Edit
+                </a>
+
+                <form method="POST" action="{{ url_for('delete_event', event_id=event.id) }}" 
+                      style="display: inline;" 
+                      onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
+                    <button type="submit" class="btn btn-small" style="background-color: #e74c3c; color: white; border: none; cursor: pointer;">
+                        Delete
+                    </button>
+                </form>
+
             </div>
             <!-- ================================================== -->
 
