@@ -144,6 +144,20 @@
                 </label>
             </div>
         </div>
+
+        <div class="form-group">
+            <label>Program Outcomes (PO) *</label>
+            <div class="po-checklist" style="display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem;">
+                {% for heading in po_headings %}
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="selected_pos" value="{{ heading }}"
+                        {% if heading in selected_pos_list %}checked{% endif %}>
+                    <span>{{ heading }}</span>
+                </label>
+                {% endfor %}
+            </div>
+            <small>Select at least one Program Outcome. No custom PO.</small>
+        </div>
         
         <div class="form-group">
             <label for="appreciation_letter">Appreciation Letter (Scanned)</label>

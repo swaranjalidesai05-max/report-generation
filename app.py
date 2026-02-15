@@ -45,6 +45,22 @@ PSO2_TEXT = (
     "graduates should be able to work on large-scale computing systems."
 )
 
+# Programme Outcomes (PO) – hardcoded headings only; no custom PO.
+# Used in multi-select "selected_pos" and in report generation.
+PO_HEADINGS = [
+    "Engineering Knowledge",
+    "Problem Analysis",
+    "Design / Development of Solutions",
+    "Conduct investigations of complex problems",
+    "Modern Tool Usage",
+    "The Engineer and Society",
+    "Environment and Sustainability",
+    "Ethics",
+    "Communication",
+    "Project Management & Finance",
+    "Lifelong Learning",
+]
+
 
 # ---------------- DATABASE ----------------
 
@@ -103,7 +119,8 @@ def init_db():
             outcome_3 TEXT,
             feedback_data TEXT,
             pso1_selected INTEGER DEFAULT 0,
-            pso2_selected INTEGER DEFAULT 0
+            pso2_selected INTEGER DEFAULT 0,
+            selected_pos TEXT
         )
         """
     )
@@ -131,6 +148,7 @@ def init_db():
         ("feedback_data", "TEXT"),
         ("pso1_selected", "INTEGER DEFAULT 0"),
         ("pso2_selected", "INTEGER DEFAULT 0"),
+        ("selected_pos", "TEXT"),
     ]
     for col_name, col_type in new_event_columns:
         if col_name not in event_cols:
@@ -591,6 +609,15 @@ def add_event():
                 return redirect(url_for("add_event", event_id=event_id))
             return redirect(url_for("add_event"))
 
+        # Program Outcomes (PO): multi-select; only allow hardcoded headings (no custom).
+        raw_pos = request.form.getlist("selected_pos")
+        selected_pos = [p for p in raw_pos if p in PO_HEADINGS]
+        if not selected_pos:
+            flash("Please select at least one Program Outcome.")
+            if event_id:
+                return redirect(url_for("add_event", event_id=event_id))
+            return redirect(url_for("add_event"))
+
         # Event photos (multiple) - preserve existing if no new uploads
         event_photos_paths = []
         if "event_photos" in request.files:
@@ -666,7 +693,7 @@ def add_event():
                     permission_letter=?, invitation_letter=?, notice_letter=?,
                     appreciation_letter=?, event_photos=?, attendance_photo=?,
                     outcome_1=?, outcome_2=?, outcome_3=?, feedback_data=?,
-                    pso1_selected=?, pso2_selected=?
+                    pso1_selected=?, pso2_selected=?, selected_pos=?
                 WHERE id=?
                 """,
                 (
@@ -694,6 +721,7 @@ def add_event():
                     json.dumps(feedback_data) if feedback_data else None,
                     pso1_selected,
                     pso2_selected,
+                    json.dumps(selected_pos),
                     event_id,
                 ),
             )
@@ -710,9 +738,9 @@ def add_event():
                     permission_letter, invitation_letter, notice_letter,
                     appreciation_letter, event_photos, attendance_photo,
                     outcome_1, outcome_2, outcome_3, feedback_data,
-                    pso1_selected, pso2_selected
+                    pso1_selected, pso2_selected, selected_pos
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     title,
@@ -739,6 +767,7 @@ def add_event():
                     json.dumps(feedback_data) if feedback_data else None,
                     pso1_selected,
                     pso2_selected,
+                    json.dumps(selected_pos),
                 ),
             )
             flash("Event added successfully.")
@@ -755,8 +784,25 @@ def add_event():
             feedback_list = json.loads(event["feedback_data"])
         except (json.JSONDecodeError, TypeError):
             feedback_list = []
-    
-    return render_template("add_event.html", event=event, event_id=event_id, feedback_list=feedback_list)
+
+    # Parse selected_pos for multi-select (edit mode)
+    selected_pos_list = []
+    if event and event.get("selected_pos"):
+        try:
+            selected_pos_list = json.loads(event["selected_pos"])
+            if not isinstance(selected_pos_list, list):
+                selected_pos_list = []
+        except (json.JSONDecodeError, TypeError):
+            selected_pos_list = []
+
+    return render_template(
+        "add_event.html",
+        event=event,
+        event_id=event_id,
+        feedback_list=feedback_list,
+        po_headings=PO_HEADINGS,
+        selected_pos_list=selected_pos_list,
+    )
 
 @app.route("/event/<int:event_id>")
 @login_required
@@ -823,6 +869,18 @@ def generate_report(event_id):
         selected_psos.append(PSO2_TEXT)
     pso_section_text = "\n\n".join(selected_psos)
 
+    # Build PO section: selected Program Outcomes as bullet list (for {{PO_SECTION}}).
+    # Equivalent to: {% for po in selected_pos %} • {{po}} {% endfor %}
+    selected_pos = []
+    if event.get("selected_pos"):
+        try:
+            selected_pos = json.loads(event["selected_pos"])
+            if not isinstance(selected_pos, list):
+                selected_pos = []
+        except (json.JSONDecodeError, TypeError):
+            selected_pos = []
+    po_section_text = "\n".join("• " + po for po in selected_pos)
+
     replace_placeholders(doc, {
         "{{academic_year}}": event["academic_year"],
         "{{date}}": event["date"],
@@ -843,6 +901,7 @@ def generate_report(event_id):
         "{{outcome_2}}": event["outcome_2"],
         "{{outcome_3}}": event["outcome_3"],
         "{{PSO_SECTION}}": pso_section_text,
+        "{{PO_SECTION}}": po_section_text,
     })
 
     insert_event_details_paragraph(doc, "<<EVENT_DETAILS>>", event)
